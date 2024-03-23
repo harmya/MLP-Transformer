@@ -1,0 +1,6 @@
+__pycache__
+media
+jokes.txt
+padded_jokes.txt
+reddit_jokes.json
+embeddings.json
