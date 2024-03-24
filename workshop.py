@@ -12,6 +12,9 @@ from transformers import BertTokenizer
 context_length = 128
 batch_size = 8
 d_embed = 64
+num_heads = 4
+num_blocks = 4
+epochs = 1000
 
 # ----------------- Functions -----------------
 def load_jokes(file_path):
@@ -156,4 +159,32 @@ jokes = load_jokes('jokes.txt')
 
 # Tokenize jokes
 tokenized_jokes, vocab_size = tokenize_jokes(jokes)
-print(tokenized_jokes['input_ids'].shape)
+print(vocab_size)
+
+# get data
+data = tokenized_jokes['input_ids']
+
+#split data
+split = int(len(data) * 0.8)
+train_jokes = data[:split]
+val_jokes = data[split:]
+
+# Initialize model
+model = Transformer(d_embed, num_heads, num_blocks)
+
+# Initialize optimizer
+optimizer = torch.optim.AdamW(model.parameters(), lr=0.001)
+
+# Initialize loss
+loss = None
+
+for i in range(epochs):
+    x, y = get_batch('train')
+    optimizer.zero_grad()
+    logits, loss = model(x, y)
+    loss.backward()
+    optimizer.step()
+    if i % 100 == 0:
+        print(f'Epoch: {i}, Loss: {loss.item()}')
+
+
