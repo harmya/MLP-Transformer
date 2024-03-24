@@ -23,7 +23,8 @@ def load_jokes(file_path):
 def tokenize_jokes(jokes):
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
     tokenized_jokes = tokenizer(jokes, return_tensors='pt', padding=True, truncation=True, max_length=context_length)
-    return tokenized_jokes
+    vocab_size = tokenizer.vocab_size
+    return tokenized_jokes, vocab_size
 
 
 def get_batch(split_type=None):
@@ -154,6 +155,5 @@ class Transformer(nn.Module):
 jokes = load_jokes('jokes.txt')
 
 # Tokenize jokes
-tokenized_jokes = tokenize_jokes(jokes)
-vocab_size = tokenized_jokes['input_ids'].shape[1]
-print(f'Vocab size: {vocab_size}')
+tokenized_jokes, vocab_size = tokenize_jokes(jokes)
+print(tokenized_jokes['input_ids'].shape)
