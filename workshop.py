@@ -16,20 +16,22 @@ num_heads = 4
 num_blocks = 4
 epochs = 1000
 
-# ----------------- Functions -----------------
+# ----------------- Load Jokes -----------------
 def load_jokes(file_path):
     with open(file_path, 'r') as file:
         jokes = file.readlines()
     jokes = [re.sub('\n', '', joke) for joke in jokes]
     return jokes
 
-def tokenize_jokes(jokes):
-    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-    tokenized_jokes = tokenizer(jokes, return_tensors='pt', padding=True, truncation=True, max_length=context_length)
-    vocab_size = tokenizer.vocab_size
-    return tokenized_jokes, vocab_size
+jokes = load_jokes('jokes.txt')
+tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+tokenized_jokes = tokenizer(jokes, return_tensors='pt', padding=True, truncation=True, max_length=context_length)
+vocab_size = tokenizer.vocab_size
+PAD_TOKEN = tokenizer.pad_token_id
+print(vocab_size)
 
 
+# ----------------- Batch Funtion -----------------
 def get_batch(split_type=None):
     jokes = train_jokes if split_type == 'train'or split_type == None else val_jokes
     # get a offset between 0 and len(train_jokes) - batch_size - 1
@@ -38,6 +40,7 @@ def get_batch(split_type=None):
     y = torch.stack([torch.cat((jokes[random_idx + i][1:], torch.tensor([PAD_TOKEN]))) for i in range(0, batch_size)])
     return x, y
 
+# ----------------- SoftMax -----------------
 def softmax(x):
     return np.exp(x) / np.sum(np.exp(x), axis=0)
 
@@ -153,14 +156,6 @@ class Transformer(nn.Module):
     
 
 # ----------------- Model Run -----------------
-
-# Load jokes
-jokes = load_jokes('jokes.txt')
-
-# Tokenize jokes
-tokenized_jokes, vocab_size = tokenize_jokes(jokes)
-print(vocab_size)
-
 # get data
 data = tokenized_jokes['input_ids']
 
@@ -179,7 +174,7 @@ optimizer = torch.optim.AdamW(model.parameters(), lr=0.001)
 loss = None
 
 for i in range(epochs):
-    x, y = get_batch('train')
+    x, y = get_batch('train', pad_token)
     optimizer.zero_grad()
     logits, loss = model(x, y)
     loss.backward()
@@ -188,3 +183,5 @@ for i in range(epochs):
         print(f'Epoch: {i}, Loss: {loss.item()}')
 
 
+# ----------------- Save Model -----------------
+torch.save(model.state_dict(), 'transformer.pth')
