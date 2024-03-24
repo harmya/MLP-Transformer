@@ -26,6 +26,7 @@ def load_jokes(file_path):
 jokes = load_jokes('jokes.txt')
 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 tokenized_jokes = tokenizer(jokes, return_tensors='pt', padding=True, truncation=True, max_length=context_length)
+attention_mask = tokenized_jokes['attention_mask']
 vocab_size = tokenizer.vocab_size
 PAD_TOKEN = tokenizer.pad_token_id
 print(vocab_size)
@@ -53,7 +54,7 @@ class InputEmbeddings(nn.Module):
         self.vocab_size = vocab_size
         self.embedding = nn.Embedding(vocab_size, d_embed)
     
-    def forward(self, x):
+    def forward(self, x): 
         return self.embedding(x) * math.sqrt(self.d_embed)
 
 class PositionalEncoding(nn.Module):
@@ -81,12 +82,15 @@ class Head(nn.Module):
         self.value = nn.Linear(d_embed, head_size, bias=False)
         self.mask = torch.tril(torch.ones(context_length, context_length))
     
-    def forward(self, x):
+    def forward(self, x, attention_mask):
         batch_size, sequence_length, feature_dimension = x.shape
         K = self.key(x)
         Q = self.query(x)
         q_kt = Q @ K.transpose(-2, -1) / np.sqrt(feature_dimension) 
+        self.mask = self.mask.to(q_kt.device)
+        attention_mask = attention_mask.to(q_kt.device)
         q_kt = q_kt.masked_fill(self.mask == 0, float('-inf'))
+        q_kt = q_kt.masked_fill(attention_mask == 0, float('-inf'))
         scaled_qkt = torch.nn.functional.softmax(q_kt, dim=-1)
         V = self.value(x)
         attention = scaled_qkt @ V
@@ -144,16 +148,21 @@ class Transformer(nn.Module):
         batch_size, sequence_length = x.shape
         x_input_embeddings = self.input_embeddings(x)
         x_positional = self.positional_encoding(x_input_embeddings)
-        block_out = self.blocks(x_positional)
+        block_out = self.blocks(x_positional, attention_mask=attention_mask)
         layer_norm_out = self.final_layer_norm(block_out)
         logits = self.output_layer(layer_norm_out)
         loss = None
         if y is None:
             return logits, loss
         else:
-            loss = nn.CrossEntropyLoss()(logits.view(-1, vocab_size), y.view(-1))
+            loss = nn.CrossEntropyLoss()(logits.view(-1, vocab_size), y.view(-1), ignore_index=PAD_TOKEN)
             return logits, loss
     
+    def generate(self, x, max_length=128):
+        for i in range(max_length):
+            x = x[: , -context_length:]
+            logits, loss = self(x)
+            probs = torch.nn.functional.softmax(logits, dim=-1)
 
 # ----------------- Model Run -----------------
 # get data
@@ -166,17 +175,20 @@ val_jokes = data[split:]
 
 # Initialize model
 model = Transformer(d_embed, num_heads, num_blocks)
-
+device = 'mps' if torch.backends.mps.is_available() else 'cpu'
+print(device)
 # Initialize optimizer
 optimizer = torch.optim.AdamW(model.parameters(), lr=0.001)
 
 # Initialize loss
 loss = None
 
+model.to(device)
 for i in range(epochs):
     x, y = get_batch('train')
+    x, y = x.to(device), y.to(device)
     optimizer.zero_grad()
-    logits, loss = model(x, y)
+    logits, loss = model(x, y, attention_mask=attention_mask.to(device))
     loss.backward()
     optimizer.step()
     if i % 100 == 0:
