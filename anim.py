@@ -14,7 +14,7 @@ class PositionalEncodingOne(Scene):
         down_arrow = Arrow(word.get_bottom(), word.get_bottom() + 1 * DOWN, color=WHITE)
         matrix_elements = [[Tex("$PE(1, 1)$").scale(0.7)], [Tex("$PE(1, 2)$").scale(0.7)], [Tex("$PE(1, 3)$").scale(0.7)], [Tex("$PE(1, 4)$").scale(0.7)], [Text("...")], [Tex("$PE(1, d)$").scale(0.7)]]
         matrix = MobjectMatrix(matrix_elements, element_alignment_corner=DOWN).scale(0.7).next_to(down_arrow, DOWN)
-        word_pe = VGroup(word, down_arrow, matrix).shift(0.8*LEFT)
+        word_pe = VGrou-p(word, down_arrow, matrix).shift(0.8*LEFT)
         
         arrows_from_pe_sin = VGroup(
             Arrow(pe_formula_sin.get_right(), matrix_elements[0][0].get_left() + 0.15*RIGHT, color=RED, max_tip_length_to_length_ratio=0.06),
@@ -233,9 +233,6 @@ class self_attention(Scene):
              Tex("$x^{(K)}_{w_4}$",  color=YELLOW).scale(0.7)]
         ]
 
-        
-
-
         Qkt_matrix = [
             [Tex("$x^{(Q)}_{w_0} \\cdot x^{(K)}_{w_0}$").scale(0.7), 
              Tex("$x^{(Q)}_{w_0} \\cdot x^{(K)}_{w_1}$").scale(0.7), 
@@ -335,16 +332,3 @@ class multi_head_attention(Scene):
         self.play(Write(whole_2))
         self.wait(0.5)
         self.play(Write(whole_3))
-
-
-        
-
-        
-
-        
-
-        
-
-        
-
-
