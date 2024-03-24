@@ -59,7 +59,7 @@ class attention(Scene):
         x_equals = Tex("=").next_to(matrix_word_notation, LEFT)
         x = Tex("$x$").scale(0.7).next_to(x_equals, LEFT)
 
-        W_q = Tex("$W_q$", color=RED).scale(0.7).next_to(down_arrow, DOWN).shift(6 * RIGHT)
+        W_q = Tex("$W_q$", color=RED).scale(0.7).next_to(x, RIGHT).shift(6 * RIGHT)
         wq_equals = Tex("=").next_to(W_q, RIGHT)
 
         matrix_wq_elements = [[Tex("$h_1$")]]   
