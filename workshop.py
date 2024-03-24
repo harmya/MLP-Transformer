@@ -66,3 +66,94 @@ class PositionalEncoding(nn.Module):
         return (x + self.positional_encoding[: , :x.shape[1], :])
     
 
+class Head(nn.Module):
+    def __init__(self, head_size):
+        super().__init__()
+        self.key = nn.Linear(d_embed, head_size, bias=False)
+        self.query = nn.Linear(d_embed, head_size, bias=False)
+        self.value = nn.Linear(d_embed, head_size, bias=False)
+        self.mask = torch.tril(torch.ones(context_length, context_length))
+    
+    def forward(self, x):
+        batch_size, sequence_length, feature_dimension = x.shape
+        K = self.key(x)
+        Q = self.query(x)
+        q_kt = Q @ K.transpose(-2, -1) / np.sqrt(feature_dimension) 
+        q_kt = q_kt.masked_fill(self.mask == 0, float('-inf'))
+        scaled_qkt = torch.nn.functional.softmax(q_kt, dim=-1)
+        V = self.value(x)
+        attention = scaled_qkt @ V
+        return attention
+
+class MultiHeadAttention(nn.Module):
+    def __init__(self, num_heads, head_size):
+        super().__init__()
+        self.heads = nn.ModuleList([Head(head_size) for i in range(num_heads)])
+        self.linear_layer = nn.Linear(head_size * num_heads, d_embed) # head_size * num_heads = d_embed (usually)
+
+    def forward(self, x):
+        head_outputs = torch.cat([head(x) for head in self.heads], dim=-1)
+        return self.linear_layer(head_outputs)
+
+
+class FeedForward(nn.Module):
+    def __init__(self, d_embed):
+        super().__init__()
+        self.linear_layer = nn.Sequential(
+            nn.Linear(d_embed, 4 * d_embed),
+            nn.ReLU(),
+            nn.Linear(4 * d_embed, d_embed)
+        )
+    
+    def forward(self, x):
+        return self.linear_layer(x)
+
+
+class Block(nn.Module):
+    def __init__(self, d_embed, num_heads):
+        super().__init__()
+        head_size = d_embed // num_heads # head_size is "how" much of the embedding is "seen" by each head
+        self.multi_head_attention = MultiHeadAttention(head_size, num_heads)
+        self.layer_norm1 = nn.LayerNorm(d_embed)
+        self.feed_forward_layer = FeedForward(d_embed)
+        self.layer_norm2 = nn.LayerNorm(d_embed)
+    
+    def forward(self, x):
+        attention = self.multi_head_attention(x)
+        x = self.layer_norm1(x + attention)
+        feed_forward = self.feed_forward_layer(x)
+        return self.layer_norm2(x + feed_forward)
+
+class Transformer(nn.Module):
+    def __init__(self, d_embed, num_heads, num_blocks):
+        super().__init__()
+        self.input_embeddings = InputEmbeddings(d_embed, vocab_size)
+        self.positional_encoding = PositionalEncoding(d_embed, context_length)
+        self.blocks = nn.Sequential(*[Block(d_embed, num_heads) for i in range(num_blocks)])
+        self.final_layer_norm = nn.LayerNorm(d_embed)
+        self.output_layer = nn.Linear(d_embed, vocab_size)
+    
+    def forward(self, x, y = None):
+        batch_size, sequence_length = x.shape
+        x_input_embeddings = self.input_embeddings(x)
+        x_positional = self.positional_encoding(x_input_embeddings)
+        block_out = self.blocks(x_positional)
+        layer_norm_out = self.final_layer_norm(block_out)
+        logits = self.output_layer(layer_norm_out)
+        loss = None
+        if y is None:
+            return logits, loss
+        else:
+            loss = nn.CrossEntropyLoss()(logits.view(-1, vocab_size), y.view(-1))
+            return logits, loss
+    
+
+# ----------------- Model Run -----------------
+
+# Load jokes
+jokes = load_jokes('jokes.txt')
+
+# Tokenize jokes
+tokenized_jokes = tokenize_jokes(jokes)
+vocab_size = tokenized_jokes['input_ids'].shape[1]
+print(f'Vocab size: {vocab_size}')
