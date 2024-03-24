@@ -174,7 +174,7 @@ optimizer = torch.optim.AdamW(model.parameters(), lr=0.001)
 loss = None
 
 for i in range(epochs):
-    x, y = get_batch('train', pad_token)
+    x, y = get_batch('train')
     optimizer.zero_grad()
     logits, loss = model(x, y)
     loss.backward()
